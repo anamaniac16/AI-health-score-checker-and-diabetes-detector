@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+
+# Dataset
+DATA/
+*.csv
+
+# ML models
+models/*.pkl
