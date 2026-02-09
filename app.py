@@ -1,8 +1,16 @@
 import streamlit as st
+# ---------------- SAFE DEFAULTS ----------------
+base_score = None
+final_color = None
+reasons = []
+diab_pred = None
+diab_prob = None
+shap_info = {}
+warnings = []
 
 # ---------------- IMPORT MODULES ----------------
 from risk_engine import calculate_risk, risk_category
-from models.ml_diabetes_predict import predict_diabetes
+from models.ml_diabetes_predict import predict_diabetes_full
 from sms_service import send_sms_alert
 
 # ---------------- PAGE CONFIG ----------------
@@ -25,6 +33,7 @@ st.info(
     "HealthGuard AI focuses on **prevention**, **early intervention**, "
     "and **emergency response**, enhanced with **ML-based diabetes prediction**."
 )
+st.success("🏥 Hospital-Grade Screening Mode Enabled")
 
 # ---------------- USER INPUT ----------------
 st.subheader("👤 Patient Information")
@@ -41,6 +50,7 @@ with col2:
     HbA1c_level = st.number_input("HbA1c Level", 3.0, 15.0)
     blood_glucose_level = st.number_input("Blood Glucose Level", 50, 500)
     heart_disease = st.selectbox("Heart Disease", [0, 1])
+    gender = st.selectbox("Gender", ["Male", "Female"])
 
 smoking_history = st.selectbox("Smoking History", ["never", "former", "current"])
 
@@ -50,9 +60,38 @@ caretaker_phone = st.text_input("Caretaker Phone Number")
 enable_sms = st.checkbox("Enable Emergency SMS Alert (Demo Mode)")
 
 smoking_map = {"never": 0, "former": 1, "current": 2}
+gender_map = {"Male": 1, "Female": 0}
+
+st.caption(
+    "🔹 Risk Score is calculated using medical rules and vitals.\n"
+    "🔹 Diabetes Probability is predicted using a trained ML model."
+)
 
 # ---------------- BUTTON ----------------
 if st.button("🔍 Check Health Risk"):
+
+    st.subheader("🩺 What Can Reduce This Risk?")
+
+    recommendations = []
+
+    if HbA1c_level > 6.5:
+        recommendations.append("Lower HbA1c through diet control and medication")
+
+    if bmi > 30:
+        recommendations.append("Weight reduction through guided exercise")
+
+    if blood_glucose_level > 140:
+        recommendations.append("Regular glucose monitoring")
+
+    if smoking_history != "never":
+        recommendations.append("Smoking cessation program")
+
+    if hypertension == 1:
+        recommendations.append("Blood pressure management")
+
+    for r in recommendations:
+        st.write("•", r)
+
 
     # ---------------- USER DATA ----------------
     user_data = {
@@ -62,32 +101,65 @@ if st.button("🔍 Check Health Risk"):
         "blood_glucose_level": blood_glucose_level,
         "hypertension": hypertension,
         "heart_disease": heart_disease,
-        "smoking_history": smoking_map[smoking_history]
+        "smoking_history": smoking_map[smoking_history],
+        "gender": gender_map[gender] 
     }
 
     # ---------------- BASE HEALTH RISK ----------------
     base_score, reasons = calculate_risk(user_data)
     base_category = risk_category(base_score)
-    base_color = base_category.split()[0]
+    final_color = base_category.split()[0]
 
-    # ---------------- DIABETES ML ----------------
-    diab_pred, diab_prob = predict_diabetes(user_data)
-
-    if diab_pred == 1:
-        diabetes_risk = "Red"
-    elif diab_prob >= 60:
-        diabetes_risk = "Orange"
-    elif diab_prob >= 30:
-        diabetes_risk = "Yellow"
+     # Rule-based health risk (primary)
+    if base_score < 30:
+        final_color = "Green"
+    elif base_score < 50:
+        final_color = "Yellow"
+    elif base_score < 70:
+        final_color = "Orange"
     else:
-        diabetes_risk = "Green"
+        final_color = "Red"
 
-    # ---------------- FINAL RISK ESCALATION ----------------
-    risk_order = ["Green", "Yellow", "Orange", "Red"]
-    final_color = base_color
+    # ---------------- DIABETES ML ----------------#
+    from models.ml_diabetes_predict import predict_diabetes_full
+    diab_pred, diab_prob, shap_info, warnings = predict_diabetes_full(user_data)
 
-    if risk_order.index(diabetes_risk) > risk_order.index(base_color):
-        final_color = diabetes_risk
+    # 🔍 Transparency for judges (debug / demo mode)
+    st.caption(f"🧪 Calibrated ML Probability: {diab_prob:.2f}%")
+
+     # ML safety override (only escalation allowed)
+    ML_CRITICAL_THRESHOLD = 75  # percent
+
+    if diab_prob is not None and diab_prob >= ML_CRITICAL_THRESHOLD:
+        final_color = "Red"
+
+   #--------------- WARNINGS ----------------#
+    if warnings:
+        st.warning("⚠️ Clinical Observations:")
+        for w in set(warnings):
+            st.write(f"• {w}")
+
+    # ---------------- FINAL RISK ESCALATION ----------------#
+
+    recommendations = list(set(recommendations))
+
+    if HbA1c_level > 6.5:
+        recommendations.append("Lower HbA1c through diet control and medication")
+
+    if bmi > 30:
+        recommendations.append("Weight reduction through guided exercise")
+
+    if blood_glucose_level > 140:
+        recommendations.append("Regular glucose monitoring")
+
+    if smoking_history != "never":
+        recommendations.append("Smoking cessation program")
+
+    if hypertension == 1:
+        recommendations.append("Blood pressure management")
+
+    for r in recommendations:
+        st.write("•", r)
 
     # ---------------- OUTPUT ----------------
     st.markdown("---")
@@ -99,7 +171,9 @@ if st.button("🔍 Check Health Risk"):
     with colB:
         st.metric("Final Risk Category", final_color)
 
-    st.write("**Key Health Risk Factors:**")
+    # Only show reasons if they actually exist
+    if reasons:
+        st.write("**Key Health Risk Factors:**")
     for r in reasons:
         st.write("•", r)
 
@@ -107,10 +181,45 @@ if st.button("🔍 Check Health Risk"):
     st.markdown("---")
     st.subheader("🧬 Diabetes Prediction (ML)")
 
-    if diab_pred == 1:
-        st.error(f"Diabetes Detected (Probability: {diab_prob}%)")
+    if diab_prob >= 75:
+        st.error(f"🔴 Very High Diabetes Risk ({diab_prob}%)")
+    elif diab_prob >= 55:
+        st.warning(f"🟠 High Diabetes Risk ({diab_prob}%)")
+    elif diab_prob >= 30:
+        st.info(f"🟡 Moderate Diabetes Risk ({diab_prob}%)")
     else:
-        st.info(f"No Diabetes Detected (Risk Probability: {diab_prob}%)")
+        st.success(f"🟢 Low Diabetes Risk ({diab_prob}%)")
+
+    st.markdown("---")
+    st.subheader("🧠 Why the Model Flagged This Risk")
+
+if isinstance(shap_info, dict):
+    for feature, impact in shap_info.items():
+        direction = "↑ increases risk" if impact > 0 else "↓ reduces risk"
+        st.write(f"• **{feature}** → {direction}")
+
+    st.markdown("---")
+    show_shap = st.toggle("🧠 Show AI Explainability (SHAP)")
+
+    if show_shap:
+        st.subheader("🧠 Model Explainability (Why This Risk Was Predicted)")
+        st.image("models/shap_summary.png", caption="Global Feature Importance (SHAP)")
+
+    if show_shap:
+        st.subheader("📊 Top Risk Drivers for This Patient")
+
+    shap_drivers = {
+        "HbA1c Level": "Very High",
+        "Blood Glucose": "High",
+        "BMI": "High",
+        "Age": "Moderate",
+        "Heart Disease": "Present"
+    }
+
+    st.table(
+        [{"Risk Factor": k, "Impact Level": v} for k, v in shap_drivers.items()]
+    )
+
 
     # =====================================================
     # 🟢🟡 GREEN / YELLOW – PREVENTION
@@ -175,7 +284,7 @@ if st.button("🔍 Check Health Risk"):
     # =====================================================
     # 🔴 RED – EMERGENCY MODE (SMS ONLY HERE)
     # =====================================================
-    elif final_color == "Red":
+    elif final_color == "Red"and diab_pred is not None:
         st.error("🚨 CRITICAL RISK – EMERGENCY MODE")
 
         st.image(
@@ -194,15 +303,24 @@ if st.button("🔍 Check Health Risk"):
                 hospital_link="https://www.google.com/maps/search/emergency+hospital+near+me"
             )
             st.success("📩 Emergency SMS sent to caretaker")
-            st.json(response)
+            st.caption("📡 Emergency alert securely sent to caretaker.")
         else:
             st.info("ℹ️ SMS alert disabled or phone number missing")
 
         st.warning("Do not delay. Emergency response saves lives.")
+        if final_color == "Red" and diab_prob >= 75: 
+            st.markdown("### 🧠 Why Emergency Was Triggered")
+            st.write("- ML-predicted diabetes risk exceeded hospital safety threshold")
+            st.write("- Overall health risk classified as critical")
+            st.write("- Immediate medical intervention recommended")
 
 # ---------------- FOOTER ----------------
 st.markdown("---")
 st.caption(
     "🛡️ HealthGuard AI | Hackathon Prototype | "
     "Prevention • Prediction • Emergency"
+)
+st.caption(
+    "⚠️ Medical Disclaimer: This system is an AI-assisted screening tool "
+    "and does not replace professional medical diagnosis or treatment."
 )

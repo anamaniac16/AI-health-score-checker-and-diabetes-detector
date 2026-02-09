@@ -1,13 +1,20 @@
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
 
 # Virtual environment
 .venv/
+env/
+venv/
 
-# Dataset
+# Pytest cache
+.pytest_cache/
+
+# Datasets
 DATA/
 *.csv
 
-# ML models
-models/*.pkl
+# OS files
+.DS_Store
+Thumbs.db
