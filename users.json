@@ -1,0 +1,28 @@
+{
+    "faizshahzadkhan13@gmail.com": {
+        "password": "e9e51885ee4bcd4f9e423f3e1967cd1d5718dbab9ad128de330df6dcb46610eb",
+        "history": [
+            {
+                "risk_score": 0,
+                "risk_category": "Green",
+                "diabetes_probability": 1.4
+            },
+            {
+                "risk_score": 45,
+                "risk_category": "Red",
+                "diabetes_probability": 99.69
+            },
+            {
+                "risk_score": 15,
+                "risk_category": "Green",
+                "diabetes_probability": 1.4
+            },
+            {
+                "risk_score": 15,
+                "risk_category": "Green",
+                "diabetes_probability": 1.4
+            }
+        ],
+        "primary": true
+    }
+}

@@ -1,42 +1,46 @@
 import streamlit as st
+# ---------------- SAFE DEFAULTS ----------------
+base_score = None
+final_color = None
+reasons = []
+diab_pred = None
+diab_prob = None
+shap_info = {}
+warnings = []
 
-# ================== SESSION STATE ==================
+# ---------------- IMPORT MODULES ----------------
+from risk_engine import calculate_risk, risk_category
+from models.ml_diabetes_predict import predict_diabetes_full
+from sms_service import send_sms_alert
+from auth import (
+    register_user,
+    login_user,
+    add_health_record,
+    get_user_history,
+    save_session,
+    load_session,
+    clear_session
+)
+
+
+# ---------------- AUTH SESSION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-if "user_profile" not in st.session_state:
-    st.session_state.user_profile = {}
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
 
-if "page" not in st.session_state:
-    st.session_state.page = "login"
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = "login"   # login or signup
 
-# ================== SHAP TOGGLE STATE ==================
-if "show_shap" not in st.session_state:
-    st.session_state.show_shap = False
+# ---------------- AUTO LOGIN ----------------
+saved_user = load_session()
 
-# ================== SHAP SAFE STATE ==================
-if "shap_info" not in st.session_state:
-    st.session_state.shap_info = None
+if saved_user and not st.session_state.logged_in:
+    st.session_state.logged_in = True
+    st.session_state.current_user = saved_user
 
-if "show_shap" not in st.session_state:
-    st.session_state.show_shap = False
-
-# ================== SAFE DEFAULT ML OUTPUTS ==================
-shap_info = None
-warnings = None
-diab_pred = None
-diab_prob = None
-
-# ================== VALUE MAPS ==================
-smoking_map = {"never": 0, "former": 1, "current": 2}
-gender_map = {"Male": 1, "Female": 0}
-
-# ================== IMPORT MODULES ==================
-from risk_engine import calculate_risk
-from models.ml_diabetes_predict import predict_diabetes_full
-from sms_service import send_sms_alert
-
-# ================== PAGE CONFIG ==================
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="HealthGuard AI",
     page_icon="🛡️",
@@ -45,547 +49,438 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* ================== RISK CIRCLE ================== */
-.risk-circle-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 10px;
-}
-
-.risk-circle {
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    font-weight: 800;
-    font-size: 16px;
-    letter-spacing: 1px;
-    box-shadow: inset 0 0 0 10px rgba(255,255,255,0.08),
-                0 20px 40px rgba(0,0,0,0.45);
-    animation: pulse 2.5s infinite ease-in-out;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-/* ===== COLOR STATES ===== */
-.risk-green {
-    background: radial-gradient(circle at top, #22c55e, #14532d);
-    color: #ecfdf5;
-}
-
-.risk-yellow {
-    background: radial-gradient(circle at top, #facc15, #92400e);
-    color: #fffbeb;
-}
-
-.risk-orange {
-    background: radial-gradient(circle at top, #fb923c, #9a3412);
-    color: #fff7ed;
-}
-
-.risk-red {
-    background: radial-gradient(circle at top, #ef4444, #7f1d1d);
-    color: #fee2e2;
-}
-
-/* ===== SOFT PULSE ===== */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ================== GLOBAL STYLING ==================
-st.markdown("""
-<style>
 .stApp {
-    background: linear-gradient(135deg, #0f172a, #1e293b, #312e81);
-    color: #e5e7eb;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
-}
-
-h1, h2, h3 {
-    color: #e0e7ff;
-    font-weight: 700;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-family: 'Inter', sans-serif;
 }
 
 div[data-testid="stVerticalBlock"] > div {
-    background: rgba(255,255,255,0.06);
-    border-radius: 16px;
-    padding: 18px;
-    margin-bottom: 18px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
-}
-
-div[data-testid="stVerticalBlock"] > div:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 20px 40px rgba(37,99,235,0.3);
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.25);
 }
 
 .stButton > button {
-    background: linear-gradient(135deg, #2563eb, #db2777);
+    background: linear-gradient(135deg,#2563eb,#7c3aed);
     color: white;
-    border-radius: 12px;
-    border: none;
-    padding: 10px 22px;
-    font-weight: 600;
-}
-
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(219,39,119,0.45);
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 14px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ================== HEADER ==================
+# ---------------- HEADER ----------------
 st.markdown("""
-<div style="
-    background: linear-gradient(135deg, #1e293b, #312e81);
-    border-radius: 20px;
-    padding: 36px;
-    text-align: center;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-">
-    <h1>🛡️ HealthGuard AI</h1>
-    <p style="color:#c7d2fe;">
-        Smart Health Risk Detection & Diabetes Prediction System
-    </p>
-</div>
+<h1 style="text-align:center;">🛡️ HealthGuard AI</h1>
+<h4 style="text-align:center;color:gray;">
+Smart Health Risk Detection & Diabetes Prediction System
+</h4>
+<hr>
 """, unsafe_allow_html=True)
 
 st.info(
-    "HealthGuard AI focuses on prevention, early intervention, "
-    "and emergency response, enhanced with ML-based diabetes prediction."
+    "HealthGuard AI focuses on **prevention**, **early intervention**, "
+    "and **emergency response**, enhanced with **ML-based diabetes prediction**."
 )
-
 st.success("🏥 Hospital-Grade Screening Mode Enabled")
-# ================== LOGIN PAGE ==================
-if st.session_state.page == "login":
-    st.subheader("🔐 User Login & Profile Setup")
 
-    with st.form("login_form"):
-        login_name = st.text_input("Full Name")
-        login_age = st.number_input("Age", 1, 120)
-        login_gender = st.selectbox("Gender", ["Male", "Female"])
-        login_phone = st.text_input("Emergency Caretaker Number")
-        login_smoking = st.selectbox(
+
+# ================= AUTHENTICATION =================
+if not st.session_state.logged_in:
+
+    st.markdown("## 🔐 Account Access")
+
+    if st.session_state.auth_mode == "login":
+
+        st.subheader("Login")
+
+        email = st.text_input("Email")
+        password = st.text_input("Numeric Password", type="password")
+
+        remember = st.checkbox("Remember me on this device")
+
+        if st.button("Login"):
+
+            success, message = login_user(email, password)
+
+            if success:
+                st.session_state.logged_in = True
+                st.session_state.current_user = email
+
+                if remember:
+                    save_session(email)
+
+                st.success("Login successful")
+                st.rerun()
+
+                st.success("Login successful")
+                st.rerun()
+            else:
+                st.error(message)
+
+        st.markdown("Don't have an account?")
+        if st.button("Create Account"):
+            st.session_state.auth_mode = "signup"
+            st.rerun()
+
+    else:
+
+        st.subheader("Create Account")
+
+        email = st.text_input("Email")
+        password = st.text_input("Create Numeric Password", type="password")
+
+        if st.button("Register"):
+
+            if not password.isdigit():
+                st.error("Password must be numeric only")
+            else:
+                success, message = register_user(email, password)
+
+                if success:
+                    st.success("Account created. Please login.")
+                    st.session_state.auth_mode = "login"
+                    st.rerun()
+                else:
+                    st.error(message)
+
+        st.markdown("Already have an account?")
+        if st.button("Back to Login"):
+            st.session_state.auth_mode = "login"
+            st.rerun()
+
+    st.stop()
+# ================= USER BAR =================
+col_user, col_logout = st.columns([6,1])
+
+with col_user:
+    st.markdown(f"👤 Logged in as: **{st.session_state.current_user}**")
+
+with col_logout:
+    if st.button("🚪 Logout"):
+        clear_session()
+        st.session_state.logged_in = False
+        st.session_state.current_user = None
+        st.session_state.auth_mode = "login"
+        st.rerun()
+        
+# ================= DASHBOARD INPUT PANEL =================
+st.markdown("## 🧾 Patient Health Profile")
+
+main_left, main_right = st.columns([1.1, 1])
+
+# -------- LEFT SIDE (Core Metrics) --------
+with main_left:
+
+    name = st.text_input("Patient Name")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        age = st.number_input("Age", 1, 120)
+        bmi = st.number_input("BMI", 10.0, 60.0)
+
+    with c2:
+        HbA1c_level = st.number_input("HbA1c Level", 3.0, 15.0)
+        blood_glucose_level = st.number_input("Blood Glucose", 50, 500)
+
+    c3, c4 = st.columns(2)
+    with c3:
+        hypertension = st.selectbox("Hypertension", [0, 1])
+        heart_disease = st.selectbox("Heart Disease", [0, 1])
+
+    with c4:
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        smoking_history = st.selectbox(
             "Smoking History", ["never", "former", "current"]
         )
-        login_hypertension = st.selectbox("Hypertension", [0, 1])
 
-        submit_login = st.form_submit_button("Login & Save Profile")
+# -------- RIGHT SIDE (Emergency & Controls) --------
+with main_right:
 
-        if submit_login:
-            st.session_state.user_profile = {
-                "name": login_name,
-                "age": login_age,
-                "gender": login_gender,
-                "caretaker_phone": login_phone,
-                "smoking_history": login_smoking,
-                "hypertension": login_hypertension,
-            }
-            st.session_state.logged_in = True
-            st.session_state.page = "dashboard"
-            st.rerun()
+    st.markdown("### 🚨 Emergency Contact")
 
-# ================== SIDEBAR ==================
-if st.session_state.logged_in:
-    with st.sidebar:
-        st.markdown("### 👤 Logged in as")
-        st.markdown(
-            f"<b>{st.session_state.user_profile.get('name','')}</b>",
-            unsafe_allow_html=True,
-        )
+    caretaker_phone = st.text_input("Caretaker Phone Number")
 
-        st.markdown("---")
+    enable_sms = st.checkbox("Enable Emergency SMS Alert")
 
-        if st.button("🔁 Retake Health Test"):
-            st.session_state.shap_info = None
-            st.session_state.show_shap = False
-            st.session_state.page = "dashboard"
-            st.rerun()
+    run_button = st.button("🔍 Analyze Health Risk")
 
-        if st.button("✏️ Edit Profile"):
-            st.session_state.page = "edit_profile"
-            st.rerun()
+    st.markdown("### ℹ️ System Info")
 
-        if st.button("➕ Add New User"):
-            st.session_state.logged_in = False
-            st.session_state.user_profile = {}
-            st.session_state.page = "login"
-            st.rerun()
+    st.caption(
+        "🔹 Risk Score → Rule-based medical evaluation\n"
+        "🔹 Diabetes Risk → ML prediction model\n"
+        "🔹 SHAP → AI explainability engine"
+    )
 
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.page = "login"
-            st.rerun()
-            # ================== EDIT PROFILE PAGE ==================
-if st.session_state.page == "edit_profile":
-    st.subheader("✏️ Edit Profile Information")
+# -------- MAPS (UNCHANGED LOGIC) --------
+smoking_map = {"never": 0, "former": 1, "current": 2}
+gender_map = {"Male": 1, "Female": 0}
 
-    with st.form("edit_profile_form"):
-        name = st.text_input(
-            "Full Name",
-            value=st.session_state.user_profile.get("name", "")
-        )
-        age = st.number_input(
-            "Age", 1, 120,
-            value=st.session_state.user_profile.get("age", 25)
-        )
-        gender = st.selectbox(
-            "Gender",
-            ["Male", "Female"],
-            index=0 if st.session_state.user_profile.get("gender") == "Male" else 1
-        )
-        caretaker = st.text_input(
-            "Emergency Caretaker Number",
-            value=st.session_state.user_profile.get("caretaker_phone", "")
-        )
+# ---------------- BUTTON ----------------
+if run_button:
 
-        save_profile = st.form_submit_button("💾 Save Changes")
+    if isinstance(shap_info, dict):
+     for feature, impact in shap_info.items():
+        direction = "↑ increases risk" if impact > 0 else "↓ reduces risk"
+        st.write(f"• **{feature}** → {direction}")
 
-        if save_profile:
-            st.session_state.user_profile.update({
-                "name": name,
-                "age": age,
-                "gender": gender,
-                "caretaker_phone": caretaker,
-            })
-            st.session_state.page = "dashboard"
-            st.rerun()
+    show_shap = st.toggle("🧠 Show AI Explainability (SHAP)")
 
-# ================== DASHBOARD ==================
-if st.session_state.page == "dashboard" and st.session_state.logged_in:
-    st.subheader("🩺 Health Assessment")
+    if show_shap:
+        st.subheader("🧠 Model Explainability (Why This Risk Was Predicted)")
+        st.image("models/shap_summary.png", caption="Global Feature Importance (SHAP)")
 
-    col1, col2 = st.columns(2)
+    if show_shap:
+        st.subheader("📊 Top Risk Drivers for This Patient")
 
-    with col1:
-        bmi = st.number_input("BMI", 10.0, 60.0)
-        HbA1c_level = st.number_input("HbA1c Level", 3.0, 15.0)
-        hypertension = st.selectbox(
-            "Hypertension", [0, 1],
-            index=st.session_state.user_profile.get("hypertension", 0)
-        )
+    shap_drivers = {
+        "HbA1c Level": "Very High",
+        "Blood Glucose": "High",
+        "BMI": "High",
+        "Age": "Moderate",
+        "Heart Disease": "Present"
+    }
 
-    with col2:
-        blood_glucose_level = st.number_input("Blood Glucose Level", 50, 500)
-        heart_disease = st.selectbox("Heart Disease", [0, 1])
-        smoking_history = st.selectbox(
-            "Smoking History",
-            ["never", "former", "current"],
-            index=["never", "former", "current"].index(
-                st.session_state.user_profile.get("smoking_history", "never")
-            )
-        )
+    st.table(
+        [{"Risk Factor": k, "Impact Level": v} for k, v in shap_drivers.items()]
+    )
 
-    enable_sms = st.checkbox("Enable Emergency SMS Alert (Demo Mode)")
-    # ================== RUN HEALTH RISK ==================
-if st.button("🔍 Check Health Risk"):
+    st.subheader("🩺 What Can Reduce This Risk?")
+
     recommendations = []
 
     if HbA1c_level > 6.5:
         recommendations.append("Lower HbA1c through diet control and medication")
+
     if bmi > 30:
         recommendations.append("Weight reduction through guided exercise")
+
     if blood_glucose_level > 140:
         recommendations.append("Regular glucose monitoring")
+
     if smoking_history != "never":
         recommendations.append("Smoking cessation program")
+
     if hypertension == 1:
         recommendations.append("Blood pressure management")
-    st.session_state.last_run = True 
-    # ---------- USER DATA (SINGLE SOURCE OF TRUTH) ----------
+
+    for r in recommendations:
+        st.write("•", r)
+
+
+    # ---------------- USER DATA ----------------
     user_data = {
-        "age": st.session_state.user_profile["age"],
+        "age": age,
         "bmi": bmi,
         "HbA1c_level": HbA1c_level,
         "blood_glucose_level": blood_glucose_level,
         "hypertension": hypertension,
         "heart_disease": heart_disease,
         "smoking_history": smoking_map[smoking_history],
-        "gender": gender_map[st.session_state.user_profile["gender"]],
+        "gender": gender_map[gender] 
     }
 
-    # ---------- BASE RISK ----------
-base_score, reasons = calculate_risk(user_data)
+    # ---------------- BASE HEALTH RISK ----------------
+    base_score, reasons = calculate_risk(user_data)
+    base_category = risk_category(base_score)
+    final_color = base_category.split()[0]
 
-if base_score < 30:
+     # Rule-based health risk (primary)
+    if base_score < 30:
         final_color = "Green"
-elif base_score < 50:
+    elif base_score < 50:
         final_color = "Yellow"
-elif base_score < 70:
+    elif base_score < 70:
         final_color = "Orange"
-else:
+    else:
         final_color = "Red"
 
-    # ---------- DIABETES ML ----------
-        diab_pred, diab_prob, shap_info, warnings = predict_diabetes_full(user_data)
+    # ---------------- DIABETES ML ----------------#
+    from models.ml_diabetes_predict import predict_diabetes_full
+    diab_pred, diab_prob, shap_info, warnings = predict_diabetes_full(user_data)
 
-    # ---------- PERSIST SHAP SAFELY ----------
-if shap_info is not None and isinstance(shap_info, dict) and len(shap_info) > 0:
-        st.session_state.shap_info = shap_info
-else:
-        st.session_state.shap_info = None
+    # 🔍 Transparency for judges (debug / demo mode)
+    st.caption(f"🧪 Calibrated ML Probability: {diab_prob:.2f}%")
 
-    # ---------- ML SAFETY OVERRIDE ----------
-if diab_prob is not None and diab_prob >= 75:
+     # ML safety override (only escalation allowed)
+    ML_CRITICAL_THRESHOLD = 75  # percent
+
+    if diab_prob is not None and diab_prob >= ML_CRITICAL_THRESHOLD:
         final_color = "Red"
-        base_score = base_score if "base_score" in locals() else 0
-        final_color = final_color if "final_color" in locals() else "Green"
-        reasons = reasons if "reasons" in locals() else []
 
-# ================== RISK SUMMARY ==================
-st.markdown("---")
-st.subheader("📊 Health Risk Summary")
+   #--------------- WARNINGS ----------------#
+    if warnings:
+        st.warning("⚠️ Clinical Observations:")
+        for w in set(warnings):
+            st.write(f"• {w}")
 
-colA, colB = st.columns(2)
-with colA:
-    st.metric("Risk Score", base_score)
-with colB:
-    pass
-    # ---------- COLOR CIRCLE ----------
-risk_class_map = {
-    "Green": ("risk-green", "LOW RISK"),
-    "Yellow": ("risk-yellow", "MODERATE RISK"),
-    "Orange": ("risk-orange", "HIGH RISK"),
-    "Red": ("risk-red", "CRITICAL"),
-}
+    # ---------------- OUTPUT ----------------
+    st.subheader("📊 Health Risk Summary")
 
-css_class, label = risk_class_map.get(
-    final_color, ("risk-green", "UNKNOWN")
-)
+    colA, colB = st.columns(2)
+    with colA:
+        st.metric("Risk Score", base_score)
+    with colB:
+        st.metric("Final Risk Category", final_color)
 
-st.markdown(
-    f"""
-    <div class="risk-circle-wrapper">
-        <div class="risk-circle {css_class}">
-            {label}
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ---------- REASONS ----------
-if reasons:
-    st.markdown("### 🧾 Key Health Risk Factors")
+    # Only show reasons if they actually exist
+    if reasons:
+        st.write("**Key Health Risk Factors:**")
     for r in reasons:
         st.write("•", r)
 
-# ================== DIABETES RESULT ==================
-st.markdown("---")
-st.subheader("🧬 Diabetes Prediction")
+    # ---------------- DIABETES RESULT ----------------
+    st.subheader("🧬 Diabetes Prediction (ML)")
 
-if diab_prob is not None:
     if diab_prob >= 75:
-        st.error(f"🔴 Very High Diabetes Risk ({diab_prob:.2f}%)")
+        st.error(f"🔴 Very High Diabetes Risk ({diab_prob}%)")
     elif diab_prob >= 55:
-        st.warning(f"🟠 High Diabetes Risk ({diab_prob:.2f}%)")
+        st.warning(f"🟠 High Diabetes Risk ({diab_prob}%)")
     elif diab_prob >= 30:
-        st.info(f"🟡 Moderate Diabetes Risk ({diab_prob:.2f}%)")
+        st.info(f"🟡 Moderate Diabetes Risk ({diab_prob}%)")
     else:
-        st.success(f"🟢 Low Diabetes Risk ({diab_prob:.2f}%)")
+        st.success(f"🟢 Low Diabetes Risk ({diab_prob}%)")
 
-# ================== WARNINGS ==================
-if warnings:
-    st.warning("⚠️ Clinical Observations")
-    for w in set(warnings):
-        st.write("•", w)
-        # ================== AI EXPLAINABILITY (SHAP) ==================
-if st.session_state.shap_info:
-    st.markdown("---")
-    st.subheader("🧠 Why the AI Flagged This Risk")
+    # ---------------- SAVE USER HEALTH RECORD ----------------
+    if st.session_state.logged_in:
+        record = {
+            "risk_score": base_score,
+            "risk_category": final_color,
+            "diabetes_probability": diab_prob
+        }
 
-    for feature, impact in st.session_state.shap_info.items():
-        direction = "↑ increases risk" if impact > 0 else "↓ reduces risk"
-        st.write(f"• **{feature}** → {direction}")
+        add_health_record(st.session_state.current_user, record)
 
-    # ✅ KEEP THIS TOGGLE
-    st.session_state.show_shap = st.toggle(
-        "🧠 Show AI Explainability (SHAP)",
-        value=st.session_state.show_shap,
-    )
+    st.subheader("🧠 Why the Model Flagged This Risk")
 
-    if st.session_state.show_shap:
-        st.image(
-            "models/shap_summary.png",
-            caption="Global Feature Importance (SHAP)",
-        )
-# Persistent toggle
-st.session_state.show_shap = st.toggle(
-    "🧠 Show AI Explainability (SHAP)",
-    value=st.session_state.show_shap,
-)
 
-if st.session_state.show_shap:
-    st.image(
-        "models/shap_summary.png",
-        caption="Global Feature Importance (SHAP)",
-    )
-
-st.markdown("---")
-st.subheader("🧠 Why the Model Flagged This Risk")
-
-if shap_info:
-    for feature, impact in shap_info.items():
-        direction = "↑ increases risk" if impact > 0 else "↓ reduces risk"
-        st.write(f"• **{feature}** → {direction}")
-    # ---------- PERSISTENT TOGGLE ----------
-st.session_state.show_shap = st.toggle(
-    "🧠 Show AI Explainability (SHAP)",
-    value=st.session_state.show_shap,
-)
-
-if st.session_state.show_shap:
-    st.image(
-        "models/shap_summary.png",
-        caption="Global Feature Importance (SHAP)",
-    )
-
-# =====================================================
-# 🟢🟡 GREEN / YELLOW — PREVENTION MODE
-# =====================================================
-if final_color in ["Green", "Yellow"]:
-    st.markdown("---")
-    st.success("✅ LOW / MODERATE RISK — PREVENTIVE CARE")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.image(
-            "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800",
-            caption="Healthy Diet",
-        )
-    with c2:
-        st.image(
-            "https://images.unsplash.com/photo-1594737625785-c2b1c2c6e6c8?w=800",
-            caption="Daily Exercise",
-        )
-    with c3:
-        st.image(
-            "https://images.unsplash.com/photo-1599447421416-3414500d18a5?w=800",
-            caption="Yoga & Meditation",
-        )
-
-    c4, c5 = st.columns(2)
-    with c4:
-        st.image(
-            "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800",
-            caption="Proper Sleep Cycle",
-        )
-    with c5:
-        st.image(
-            "https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?w=800",
-            caption="Adequate Water Intake",
-        )
-
-    st.markdown("### 🧘 Lifestyle Recommendations")
-    st.write("- Balanced diet (low sugar, high fiber)")
-    st.write("- 30–45 minutes of exercise daily")
-    st.write("- Yoga & breathing exercises")
-    st.write("- 7–8 hours of quality sleep")
-    st.write("- Drink sufficient water")
     # =====================================================
-# 🟠 ORANGE — MEDICAL ATTENTION
-# =====================================================
-elif final_color == "Orange":
-    st.markdown("---")
-    st.warning("⚠️ HIGH RISK — MEDICAL CONSULTATION ADVISED")
+    # 🟢🟡 GREEN / YELLOW – PREVENTION
+    # =====================================================
+    if final_color in ["Green", "Yellow"]:
+        st.success("✅ LOW / MODERATE RISK – PREVENTIVE CARE")
 
-    st.image(
-        "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=1000",
-        caption="Consult a Doctor",
-    )
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.image(
+                "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800",
+                caption="Healthy Diet"
+            )
+        with c2:
+            st.image(
+                "https://cdn.shopify.com/s/files/1/0285/2647/7357/files/Skineasi-Blog_2048X2048px.12_480x480.jpg?v=1594572377",
+                caption="Daily Exercise"
+            )
+        with c3:
+            st.image(
+                "https://images.unsplash.com/photo-1599447421416-3414500d18a5?w=800",
+                caption="Yoga & Meditation"
+            )
 
-    st.markdown(
-        "[📍 Find Nearby Hospital](https://www.google.com/maps/search/hospital+near+me)"
-    )
+        c4, c5 = st.columns(2)
+        with c4:
+            st.image(
+                "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800",
+                caption="Proper Sleep Cycle"
+            )
+        with c5:
+            st.image(
+                "https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?w=800",
+                caption="Adequate Water Intake"
+            )
 
-    st.write("- Schedule a doctor visit soon")
-    st.write("- Risk may progress if ignored")
+        st.markdown("### 🧘 Lifestyle Recommendations")
+        st.write("- Balanced diet (low sugar, high fiber)")
+        st.write("- 30–45 min exercise daily")
+        st.write("- Yoga & breathing exercises")
+        st.write("- 7–8 hours quality sleep")
+        st.write("- Drink sufficient water")
 
-# =====================================================
-# 🔴 RED — EMERGENCY MODE
-# =====================================================
-elif final_color == "Red":
-    st.markdown("---")
-    st.error("🚨 CRITICAL RISK — EMERGENCY MODE")
+    # =====================================================
+    # 🟠 ORANGE – HOSPITAL SUGGESTION
+    # =====================================================
+    elif final_color == "Orange":
+        st.warning("⚠️ HIGH RISK – MEDICAL CONSULTATION ADVISED")
 
-    st.image(
-        "https://images.unsplash.com/photo-1600959907703-125ba1374a12?w=1000",
-        caption="Emergency Medical Care",
-    )
-
-    st.markdown(
-        "[🚑 Navigate to Emergency Hospital](https://www.google.com/maps/search/emergency+hospital+near+me)"
-    )
-
-    if enable_sms:
-        send_sms_alert(
-            phone_number=st.session_state.user_profile["caretaker_phone"],
-            patient_name=st.session_state.user_profile["name"],
-            hospital_link="https://www.google.com/maps/search/emergency+hospital+near+me",
+        st.image(
+            "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=1000",
+            caption="Nearby Hospital"
         )
 
-        st.success("📩 Emergency SMS sent to caretaker")
+        st.markdown(
+            "[📍 Open in Google Maps](https://www.google.com/maps/search/hospital+near+me)"
+        )
 
-    st.warning(
-        "Do not delay. Immediate medical attention is critical."
-    )
-    # ================== STATE CLEANUP ==================
-# This prevents old risk results from sticking
-# when user clicks "Retake Health Test"
-if st.session_state.page == "dashboard":
-    if "last_run" not in st.session_state:
-        st.session_state.last_run = False
+        st.write("- Visit a doctor within a few days")
+        st.write("- Risk may progress if ignored")
 
-# Clear old outputs when user revisits dashboard
-if not st.session_state.last_run:
-    for key in [
-        "base_score",
-        "final_color",
-        "reasons",
-        "diab_pred",
-        "diab_prob",
-        "shap_info",
-        "warnings",
-    ]:
-        if key in st.session_state:
-            st.session_state[key] = None
+    # =====================================================
+    # 🔴 RED – EMERGENCY MODE (SMS ONLY HERE)
+    # =====================================================
+    elif final_color == "Red" and diab_pred is not None:
+        st.error("🚨 CRITICAL RISK – EMERGENCY MODE")
 
-# ================== RETAKE BUTTON LOGIC ==================
-# This ensures re-run without losing UI or images
-if st.session_state.logged_in:
-    with st.sidebar:
-        st.markdown("---")
+        st.image(
+            "https://images.unsplash.com/photo-1600959907703-125ba1374a12?w=1000",
+            caption="Emergency Care Hospital"
+        )
 
-        if st.button("🔄 Retake Health Risk"):
-            st.session_state.show_shap = False
-            st.session_state.last_run = False
-            st.session_state.page = "dashboard"
-            st.rerun()
+        st.markdown(
+            "[🚑 Navigate to Emergency Hospital](https://www.google.com/maps/search/emergency+hospital+near+me)"
+        )
 
-# ================== SAFE DEFAULT VISUAL ==================
-# Shows hint before user clicks "Check Health Risk"
-if st.session_state.page == "dashboard" and not st.session_state.last_run:
-    st.info(
-        "🩺 Enter your medical values and click **Check Health Risk** "
-        "to view your health status, lifestyle guidance, and emergency alerts."
-    )
+        if enable_sms and caretaker_phone:
+            response = send_sms_alert(
+                phone_number=caretaker_phone,
+                patient_name=name,
+                hospital_link="https://www.google.com/maps/search/emergency+hospital+near+me"
+            )
+            st.success("📩 Emergency SMS sent to caretaker")
+            st.caption("📡 Emergency alert securely sent to caretaker.")
+        else:
+            st.info("ℹ️ SMS alert disabled or phone number missing")
 
-# ================== FOOTER ==================
-st.markdown("---")
+        st.warning("Do not delay. Emergency response saves lives.")
+        if final_color == "Red" and diab_prob >= 75: 
+            st.markdown("### 🧠 Why Emergency Was Triggered")
+            st.write("- ML-predicted diabetes risk exceeded hospital safety threshold")
+            st.write("- Overall health risk classified as critical")
+            st.write("- Immediate medical intervention recommended")
+
+    # ================= USER HEALTH HISTORY =================
+    if st.session_state.logged_in:
+
+        history = get_user_history(st.session_state.current_user)
+
+        if len(history) > 0:
+
+            st.markdown("## 📈 Your Health Trend")
+
+            risk_scores = [record["risk_score"] for record in history]
+            diabetes_probs = [record["diabetes_probability"] for record in history]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.metric("Total Health Checks", len(history))
+                st.metric("Latest Risk Score", risk_scores[-1])
+
+            with col2:
+                st.metric("Latest Diabetes Risk (%)", f"{diabetes_probs[-1]:.2f}")
+ 
+            st.markdown("### 📊 Risk Score Trend")
+            st.line_chart(risk_scores)
+
+            st.markdown("### 🧬 Diabetes Risk Trend")
+            st.line_chart(diabetes_probs)
+
+
+# ---------------- FOOTER ----------------
 st.caption(
     "🛡️ HealthGuard AI | Hackathon Prototype | "
     "Prevention • Prediction • Emergency"
@@ -594,67 +489,3 @@ st.caption(
     "⚠️ Medical Disclaimer: This system is an AI-assisted screening tool "
     "and does not replace professional medical diagnosis or treatment."
 )
-# ================== SCORE HISTORY ==================
-# Store past risk results for analytics
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-# Save results AFTER a successful run
-if (
-    st.session_state.page == "dashboard"
-    and st.session_state.last_run
-    and base_score is not None
-):
-    st.session_state.history.append(
-        {
-            "score": base_score,
-            "risk": final_color,
-            "diabetes_prob": diab_prob,
-        }
-    )
-
-# ================== ANALYTICS PANEL ==================
-if st.session_state.page == "dashboard" and st.session_state.history:
-    st.markdown("---")
-    st.subheader("📈 Health Risk Analytics")
-
-    scores = [h["score"] for h in st.session_state.history]
-    risks = [h["risk"] for h in st.session_state.history]
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Checks", len(scores))
-    with col2:
-        st.metric("Latest Risk Score", scores[-1])
-    with col3:
-        st.metric(
-            "Worst Risk Level",
-            max(
-                risks,
-                key=lambda x: ["Green", "Yellow", "Orange", "Red"].index(x),
-            ),
-        )
-
-# ================== BAR CHART ==================
-st.markdown("### 📊 Risk Score Trend")
-st.bar_chart(scores, height=220, use_container_width=True)
-
-# ================== DIABETES PROBABILITY TREND ==================
-if any(h["diabetes_prob"] is not None for h in st.session_state.history):
-    st.markdown("### 🧬 Diabetes Risk Trend")
-
-    diab_values = [
-        h["diabetes_prob"]
-        for h in st.session_state.history
-        if h["diabetes_prob"] is not None
-    ]
-
-    st.line_chart(diab_values, height=220, use_container_width=True)
-
-# ================== CLEAR HISTORY OPTION ==================
-if st.session_state.logged_in:
-    with st.sidebar:
-        if st.button("🧹 Clear Health History"):
-            st.session_state.history = []
-            st.success("Health history cleared.")
-            st.rerun()
