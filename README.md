@@ -1,136 +1,215 @@
-# group-project
-![CI](https://img.shields.io/badge/tests-passing-brightgreen)
-![Python](https://img.shields.io/badge/python-3.12-blue)
-![ML](https://img.shields.io/badge/ML-XGBoost-orange)
-![Explainability](https://img.shields.io/badge/Explainable-SHAP-purple)
-
 🛡️ HealthGuard AI
 
 Preventive Health Risk & Diabetes Clinical Decision Support System
-Hackathon Project | AI for Healthcare | Clinical-Grade Risk Assessment
+Hackathon Project | AI for Healthcare | Clinical-Grade Risk Intelligence Platform
 
 📌 Overview
 
-HealthGuard AI is an AI-assisted preventive healthcare system designed to identify early health risks and provide clinical decision support using a hybrid approach:
+HealthGuard AI is a hybrid preventive healthcare intelligence system designed to:
+(a) Detect early health deterioration
+(b) Predict diabetes risk using calibrated ML
+(c) Provide explainable AI outputs (SHAP)
+(d) Generate personalized AI-driven intervention plans
+(e) Escalate safely using hospital-grade logic
 
-1.Rule-based medical risk scoring (transparent & interpretable)
-2.Machine Learning–based diabetes prediction (probabilistic & calibrated)
-3.Explainable AI (SHAP) for trust and accountability
-4.Human-centered design for doctors, patients, and caregivers
+The system combines:
+(1) Rule-Based Clinical Risk Engine
+(2) XGBoost ML Diabetes Predictor
+(3) SHAP Explainability
+(4) Advanced Personalized Intervention Engine
+(5) User Authentication & Health History Tracking
+(6) Emergency Escalation with SMS Alerts
 
-The system focuses on prevention, early intervention, and safe escalation, aligning with real-world hospital workflows.
+This mirrors real-world Clinical Decision Support Systems (CDSS).
 
-🎯 Problem Statement Addressed
+🎯 Problem Statement
 
-Modern healthcare systems often:
-1.Detect disease too late
-2.Over-rely on black-box AI
-3.Lack explainability and trust
+Modern healthcare systems:
+(A) Detect disease too late
+(B) Over-rely on black-box AI
+(C) Lack patient-specific preventive guidance
+(D) Provide generic lifestyle advice
+(E) Do not enforce safe escalation logic
 
 HealthGuard AI solves this by:
-1.Surfacing early warning signs from routine patient data
-2.Combining medical rules with AI (Human + Machine)
-3.Ensuring AI can only escalate risk, never downgrade it
-4.Providing clear explanations and actionable recommendations
+✔ Combining medical logic + AI
+✔ Allowing ML to escalate but never downgrade risk
+✔ Generating personalized diet & exercise plans
+✔ Tracking patient longitudinal history
+✔ Maintaining explainability & accountability
 
 🧠 System Architecture
 
 User Input
    ↓
-Rule-Based Risk Engine  ──► Base Health Risk (Green / Yellow / Orange / Red)
+Rule-Based Risk Engine  ──► Base Health Risk
    ↓
-ML Diabetes Prediction ──► Probability (%) + SHAP Explanation
+ML Diabetes Prediction ──► Calibrated Probability (%)
    ↓
-Safety Logic
-   └─► ML can ONLY escalate risk (hospital-grade rule)
+Explainability Engine (SHAP)
    ↓
-Final Clinical Decision
+Safety Logic (Escalation Only)
+   ↓
+Final Clinical Risk Category
+   ↓
+Advanced Intervention Engine
+   ├─ Personalized Diet Plan
+   ├─ Weekly Workout Plan
+   ├─ Yoga Protocol
+   ├─ Calorie & Protein Targets
+   └─ Precautions
 
-🔬 Key Features
+🔬 Core System Modules
 
-✅ 1. Rule-Based Health Risk Engine
+✅ 1. Rule-Based Clinical Risk Engine
 
-A.Uses medically interpretable thresholds:
-  (a)Age
-  (b)BMI
-  (c)HbA1c
-  (d)Blood Glucose
-  (e)Hypertension
-  (f)Heart Disease
-  (g)Smoking History
-B.Produces:
-  Risk Score (0–100)
-  Risk Category:
-       🟢 Green – Low Risk
-       🟡 Yellow – Moderate Risk
-       🟠 Orange – High Risk
-       🔴 Red – Critical Risk
-📁 File: risk_engine.py
+📁 risk_engine.py
+
+Uses medically interpretable thresholds:
+1) Age
+2) BMI
+3) HbA1c
+4) Blood Glucose
+5) Hypertension
+6) Heart Disease
+7) Smoking History
+
+Outputs:
+(A) Risk Score (0–100)
+(B) Risk Category:
+                 🟢 Green – Low
+                 🟡 Yellow – Moderate
+                 🟠 Orange – High
+                 🔴 Red – Critical
+Transparent and fully interpretable.
 
 🤖 2. Machine Learning Diabetes Prediction
 
-Model: XGBoost (GPU-optimized)
-Output:
-    Calibrated probability (0–100%)
-    Binary prediction only for escalation logic
+📁 models/ml_diabetes_predict.py
+📁 models/diabetes_model.pkl
 
-Threshold optimized for:
-     High Recall (patient safety first)
+Model: XGBoost (GPU optimized)
+Outputs:
+(a) Calibrated probability (%)
+(b) Binary prediction (for escalation logic)
+(c) SHAP feature contributions
+Optimized for high recall (patient safety first).
 
-📁 Files:
-models/ml_diabetes_train.py
-models/ml_diabetes_predict.py
-models/diabetes_model.pkl
-models/diabetes_threshold.json
+🧠 3. Explainable AI (SHAP)
 
-🧠 3. Explainable AI (SHAP) 
+📁 models/shap_explainer.py
+📁 models/shap_summary.png
 
-Shows top contributing features for each prediction
-Uses raw XGBoost model (SHAP-compatible)
-Prevents black-box decisions
-
-📁 Files:
-models/shap_explainer.py
-models/shap_summary.png
+(a) Shows top contributing features
+(b) Prevents black-box decisions
+(c) Enables transparency for judges & clinicians
 
 🛑 4. Hospital-Grade Safety Logic
 
-ML can ONLY escalate risk — never downgrade it
+ML can ONLY escalate risk — never downgrade it.
 Example:
-       Rule-based risk = 🟡 Yellow
-       ML diabetes probability ≥ threshold
-       👉 Final risk escalates to 🔴 Red
-This mirrors real clinical decision-support systems.
 
-📊 5. Streamlit Clinical Dashboard
+---> Rule Risk = 🟡 Yellow
+     ML Probability ≥ Critical Threshold
+     👉 Final Risk = 🔴 Red
 
-Clean, intuitive UI
-Separate sections for:
-     Patient input
-     Health risk summary
-     Diabetes prediction
-     Explainability
-     Preventive recommendations
-     Emergency mode (SMS alerts)
+This mirrors real clinical escalation workflows.
 
-📁 File: app.py
+🧬 5. Advanced Intervention Engine
 
-🧪 Testing & Validation
+📁 intervention_engine.py
+📁 advanced_intervention_engine.py
 
-Automated Tests
-    Located in /tests:
-         test_risk.py
-         test_diabetes_prediction.py
-         test_threshold_logic.py
-         test_sms.py
+This module generates personalized health plans, including:
 
-Manual Validation
-    Edge cases tested:
-         Normal vitals but diabetic
-         High HbA1c with normal glucose
-         Conflicting rule vs ML outcomes
+🔹 Calorie Calculation
 
-📁 Project Structure
+(a) BMR-based (Mifflin-St Jeor)
+(b) BMI-adjusted
+(c) Risk-adjusted calorie targets
+
+🔹 Macronutrient Planning
+
+(a) Protein target (grams)
+(b) Carbohydrate adjustment for glucose risk
+(c) Heart-safe fat modulation
+
+🔹 Weekly Workout Plan
+
+(a) Risk-adjusted intensity
+(b) Heart-safe protocols
+(c) Age-modified training
+(d) Obesity-safe progression
+
+🔹 Personalized Yoga Plan
+
+(a) Hypertension-safe breathing
+(b) Cardio-protective poses
+(c) Stress reduction sequencing
+
+🔹 Ramadan Mode (Adaptive Logic)
+
+(a) Calorie redistribution
+(b) Hydration strategy
+(c) Safe fasting modifications
+
+🔹 BMI → Body Fat Estimation
+
+(a) Predictive estimation
+(b) Obesity risk mapping
+This transforms the system into a preventive metabolic optimization platform.
+
+🔐 6. Authentication & User System
+
+📁 auth.py
+📁 users.json
+
+Features:
+1) Email login
+2) Numeric password system
+3) "Remember Me" session persistence
+4) Multi-user support
+5) Primary user tracking
+6) Auto-login on same device
+7) Personal health history storage
+
+📈 7. Longitudinal Health Tracking
+
+Each user has:
+1) Historical risk scores
+2) Historical diabetes probabilities
+3) Trend visualization (line charts)
+4) Complete health check history
+5) Expandable medical records
+
+This enables longitudinal monitoring — not just one-time screening.
+
+🚨 8. Emergency Mode & SMS Alerts
+
+📁 sms_service.py
+
+When risk is 🔴 Red:
+
+1) Emergency hospital recommendation
+2) Google Maps link
+3) Optional caretaker SMS alert
+
+📊 Dashboard (Streamlit)
+
+📁 app.py
+
+Includes:
+
+• 🔐 Login / Signup
+• 🩺 Health Check tab
+• 📈 History Tab
+• 🧠 Personalized AI Plan Tab
+• 📊 Risk Visualization
+• 📉 Trend Analytics
+• 🚨 Emergency Mode
+Clean, clinical UI design.
+
+📁 Updated Project Structure
 
 GROUP-PROJECT/
 │
@@ -142,7 +221,10 @@ GROUP-PROJECT/
 │   ├── diabetes_model_raw.pkl
 │   ├── diabetes_imputer.pkl
 │   ├── diabetes_features.pkl
+│   ├── diabetes_scaler.pkl
 │   ├── diabetes_threshold.json
+│   ├── diabetes_risk_mapper.py
+│   ├── ml_data_prepare.py
 │   ├── ml_diabetes_train.py
 │   ├── ml_diabetes_predict.py
 │   ├── shap_explainer.py
@@ -150,17 +232,22 @@ GROUP-PROJECT/
 │
 ├── tests/
 │   ├── test_risk.py
-│   ├── test_diabetes_prediction.py
-│   ├── test_threshold_logic.py
-│   └── test_sms.py
+│   ├── test_ml_diabetes.py
+│   ├── test_sms.py
+│   └── test_data.py
 │
 ├── app.py
 ├── risk_engine.py
+├── intervention_engine.py
+├── advanced_intervention_engine.py
+├── preprocess.py
+├── auth.py
 ├── sms_service.py
+├── users.json
 ├── requirements.txt
 └── README.md
 
-🚀 How to Run the Project:
+🚀 How to Run
 
 1️⃣ Install Dependencies
 pip install -r requirements.txt
@@ -168,45 +255,56 @@ pip install -r requirements.txt
 2️⃣ Launch Application
 streamlit run app.py
 
-📈 Example Output Interpretation:
+📈 Example Output
 
-Component	Meaning
-Risk Score: 25	                                            Low rule-based risk
-Risk Category: Green	                                    Preventive care recommended
-Diabetes Risk: 21.44%	                                    Moderate probability (not diabetic yet)
-SHAP Output	                                                Shows why the model predicted this
+| Component                 | Meaning                               |
+| ------------------------- | ------------------------------------- |
+| Risk Score: 42            | Moderate rule-based risk              |
+| Risk Category: Yellow     | Preventive intervention required      |
+| Diabetes Probability: 68% | Elevated metabolic risk               |
+| SHAP Output               | Shows HbA1c & BMI as dominant drivers |
+| Personalized Plan         | Risk-adjusted diet + workout + yoga   |
+
+🏥 Clinical Realism
+
+✔ Transparent rule logic
+✔ ML calibration
+✔ Escalation-only override
+✔ Patient-safety-first thresholding
+✔ Longitudinal monitoring
+✔ Personalized metabolic strategy
+
+🧪 Testing
+
+Located in /tests:
+• Rule engine validation
+• ML probability validation
+• Threshold safety logic
+• SMS service testing
+• Data pipeline tests
+
+🏆 Why This Project Is Advanced
+
+✔ Hybrid AI (Rules + ML)
+✔ Explainable AI
+✔ Escalation Safety Logic
+✔ Personalized metabolic modeling
+✔ User-based longitudinal tracking
+✔ Emergency escalation
+✔ Hackathon-ready yet scalable
+
+🔮 Future Enhancements
+
+• EHR / FHIR Integration
+• Multi-disease prediction (CVD, CKD, NAFLD)
+• AI Doctor Dashboard
+• App Version
+• Cloud Deployment (AWS/GCP)
+• CI/CD Pipeline
+• Clinical Trial Simulation
 
 ⚠️ Medical Disclaimer
 
 This system is an AI-assisted screening and decision-support tool.
 It does NOT replace professional medical diagnosis or treatment.
-Final clinical decisions must always be made by qualified healthcare professionals.
-
-🏆 Why This Project Stands Out
-
-✔ Human + AI collaboration
-✔ Explainable & transparent
-✔ Clinically realistic logic
-✔ Patient-safety focused
-✔ Hackathon-ready & scalable
-
-👨‍⚕️ Future Enhancements
-
-CI/CD integration
-EHR/FHIR compatibility
-Multi-disease prediction
-Personalized lifestyle plans
-Doctor-facing analytics dashboard
-
-🙌 Team & Credits
-
-Built with ❤️ for preventive healthcare using:
-Python
-Streamlit
-XGBoost
-SHAP
-Scikit-learn
-
-🛡️ HealthGuard AI
-
-Prevention • Prediction • Protection
+All medical decisions must be made by licensed healthcare professionals.
