@@ -34,7 +34,7 @@ In high-risk cases, the system can suggest hospitals and trigger emergency alert
 
 ## Project Structure
 
-```text
+```
 app.py
 risk_engine.py
 intervention_engine.py
@@ -43,6 +43,9 @@ sms_service.py
 models/
 tests/
 README.md
+
+```
+
 How It Works
 User enters health details
 System calculates health risk score
@@ -67,15 +70,8 @@ Multi-disease prediction
 Doctor dashboard integration
 Mobile application
 Cloud deployment
-Disclaimer
 
+Disclaimer
 This project is designed as a decision-support and preventive screening tool. It should not be used as a replacement for professional medical advice.
 
 
-This version:
-- removes excessive emojis
-- keeps only risk-color emojis (good choice)
-- cuts fluff
-- sounds more natural
-- looks recruiter-friendly
-- reads like an engineer wrote it, not an AI model.
